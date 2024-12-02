@@ -283,6 +283,8 @@ class BookshelfGenerator:
             translate = stage_up_adjust(self._stage, corner, Gf.Vec3d)
             translate[1] = self.height / 2  # Center the column height correctly
             column.GetAttribute("xformOp:translate").Set(translate)
+            rotate = stage_up_adjust(self._stage, [0, 0, 90], Gf.Vec3d)  # Rotation applied here
+            column.GetAttribute("xformOp:rotateXYZ").Set(rotate)
     
         # Create intermediate floors
         for floor_num in range(1, num_floors):
