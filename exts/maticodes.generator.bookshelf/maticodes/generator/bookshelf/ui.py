@@ -63,6 +63,7 @@ class BookshelfGenWindow(ui.Window):
         self.get_bookshelves()
         with ui.VStack():
             with ui.HStack(height=0):
+            # Creates UIs for dropdown(combo) and 2 buttons (createnew + reload)
                 combo_model = ui.ComboBox(self.current_index,*[str(x.asset_root_path) for x in self.bookshelves]).model
                 
                 def combo_changed(item_model, item):
@@ -77,6 +78,7 @@ class BookshelfGenWindow(ui.Window):
                     self.current_index = len(self.bookshelves) - 1
                     value_model = combo_model.get_item_value_model()
                     value_model.set_value(self.current_index)
+                    print(f"created new, bookshelves: {self.bookshelves[0]}")
 
                 ui.Button("Create New", width=0, clicked_fn=lambda: create_new())
 

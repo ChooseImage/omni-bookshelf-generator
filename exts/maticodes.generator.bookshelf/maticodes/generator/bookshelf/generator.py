@@ -61,6 +61,30 @@ class BookshelfGenerator:
             old_selected_paths=[],
             new_selected_paths=[str(self.shelf_mtl_path)],
             expand_in_stage=True)
+        
+    def create_concrete_material(self, looks_scope_path):
+        self.concrete_mtl_path = Sdf.Path(omni.usd.get_stage_next_free_path(self._stage, looks_scope_path.AppendPath("Concrete"), False))
+        result = omni.kit.commands.execute('CreateMdlMaterialPrimCommand',
+            mtl_url='http://omniverse-content-production.s3-us-west-2.amazonaws.com/Materials/Base/Masonry/Concrete_Polished.mdl',
+            mtl_name='Concrete_Polished',
+            mtl_path=str(self.concrete_mtl_path))
+        
+        omni.kit.commands.execute('SelectPrims',
+            old_selected_paths=[],
+            new_selected_paths=[str(self.concrete_mtl_path)],
+            expand_in_stage=True)
+
+    def create_tile_material(self, looks_scope_path):
+        self.tile_mtl_path = Sdf.Path(omni.usd.get_stage_next_free_path(self._stage, looks_scope_path.AppendPath("Concrete"), False))
+        result = omni.kit.commands.execute('CreateMdlMaterialPrimCommand',
+            mtl_url='http://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/vMaterials_2/Ceramic/Ceramic_Tiles_Glazed_Mosaic_Shifted.mdl',
+            mtl_name='Ceramic_Tiles_Mosaic_Shifted_White_Worn_Matte',
+            mtl_path=str(self.tile_mtl_path))
+        
+        omni.kit.commands.execute('SelectPrims',
+            old_selected_paths=[],
+            new_selected_paths=[str(self.tile_mtl_path)],
+            expand_in_stage=True)
 
     @property
     def books_instancer_path(self):
@@ -78,11 +102,13 @@ class BookshelfGenerator:
         omni.kit.commands.execute('CreatePrim', prim_type='Scope', prim_path=str(self.geom_scope_path))
         omni.kit.commands.execute('CreatePrim', prim_type='Scope', prim_path=str(self.looks_scope_path))
         self.create_shelf_material(self.looks_scope_path)
+        self.create_concrete_material(self.looks_scope_path)
+        self.create_tile_material(self.looks_scope_path)
         prototypes_container_path = self.geom_scope_path.AppendPath("Prototypes")
 
         self.width = 150
-        self.height = 200
-        self.depth = 25
+        self.height = 800
+        self.depth = 150
         self.thickness = 2
         self.num_shelves = 3
         self.randomize_scale = True
@@ -187,6 +213,11 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         self.create_frame()
+        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front", self.tile_mtl_path)
+        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front", self.tile_mtl_path)
+        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
+        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
+        self.create_roof(self.width, self.depth)  # Roof
         self.create_shelves(self.num_shelves)
         omni.usd.get_context().get_selection().clear_selected_prim_paths()
 
@@ -247,67 +278,145 @@ class BookshelfGenerator:
         if num_shelves > 0:
             offset = self.height / (num_shelves + 1)
             for num in range(1, num_shelves + 1):
-                board = self.create_board(self.width)
+                board = self.create_board(self.width, self.depth)
                 shelf_y_pos = num * offset + self.thickness/2
                 translate = stage_up_adjust(self._stage, [0, shelf_y_pos, 0], Gf.Vec3d)
                 board.GetAttribute("xformOp:translate").Set(translate)
                 self.create_books(shelf_y_pos)
-
-    def create_frame(self):
-        # bottom
-        board = self.create_board(self.width)
-        translate = stage_up_adjust(self._stage, [0, self.thickness/2, 0], Gf.Vec3d)
-        board.GetAttribute("xformOp:translate").Set(translate)
-        # top
-        board = self.create_board(self.width)
-        translate = stage_up_adjust(self._stage, [0, self.height - self.thickness/2, 0], Gf.Vec3d)
-        board.GetAttribute("xformOp:translate").Set(translate)
-        # left
-        board = self.create_board(self.height)
-        translate = stage_up_adjust(self._stage, [-self.width/2 - self.thickness/2, self.height/2, 0], Gf.Vec3d)
-        board.GetAttribute("xformOp:translate").Set(translate)
-        rotate = stage_up_adjust(self._stage, [0, 0, 90], Gf.Vec3d)
-        board.GetAttribute("xformOp:rotateXYZ").Set(rotate)
-        # right
-        board = self.create_board(self.height)
-        translate = stage_up_adjust(self._stage, [self.width/2 + self.thickness/2, self.height/2, 0], Gf.Vec3d)
-        board.GetAttribute("xformOp:translate").Set(translate)
-        rotate = stage_up_adjust(self._stage, [0, 0, 90], Gf.Vec3d)
-        board.GetAttribute("xformOp:rotateXYZ").Set(rotate)
+    
+    def create_frame(self, num_floors=10):
+        floor_height = self.height / num_floors
+        # Create base floor
+        base_floor = self.create_board(self.width, self.depth)
+        base_translate = stage_up_adjust(self._stage, [0, floor_height / 2, 0], Gf.Vec3d)
+        base_floor.GetAttribute("xformOp:translate").Set(base_translate)
+    
+        # Create top floor
+        top_floor = self.create_board(self.width, self.depth)
+        top_translate = stage_up_adjust(self._stage, [0, self.height - floor_height / 2, 0], Gf.Vec3d)
+        top_floor.GetAttribute("xformOp:translate").Set(top_translate)
+    
+        # Create vertical columns at corners
+        corner_positions = [
+            [-self.width / 2, floor_height / 2, -self.depth / 2],  # Bottom-left-back
+            [self.width / 2, floor_height / 2, -self.depth / 2],   # Bottom-right-back
+            [-self.width / 2, floor_height / 2, self.depth / 2],   # Bottom-left-front
+            [self.width / 2, floor_height / 2, self.depth / 2]     # Bottom-right-front
+        ]
+        
+        for corner in corner_positions:
+            column = self.create_board(self.height + self.thickness, self.thickness)  # Add thickness for precise height
+            translate = stage_up_adjust(self._stage, corner, Gf.Vec3d)
+            translate[1] = self.height / 2  # Center the column height correctly
+            column.GetAttribute("xformOp:translate").Set(translate)
+            rotate = stage_up_adjust(self._stage, [0, 0, 90], Gf.Vec3d)  # Rotation applied here
+            column.GetAttribute("xformOp:rotateXYZ").Set(rotate)
+    
+        # Create intermediate floors
+        for floor_num in range(1, num_floors):
+            floor_y = floor_num * floor_height
+            floor = self.create_board(self.width, self.depth)
+            translate = stage_up_adjust(self._stage, [0, floor_y, 0], Gf.Vec3d)
+            floor.GetAttribute("xformOp:translate").Set(translate)
 
     
-    def create_board(self, width):
-        cube_prim_path = omni.usd.get_stage_next_free_path(self._stage, self.geom_scope_path.AppendPath("Board"), False)
+    def create_board(self, width, depth):
+        board_prim_path = omni.usd.get_stage_next_free_path(self._stage, self.geom_scope_path.AppendPath("Board"), False)
         success, result = omni.kit.commands.execute('CreateMeshPrimWithDefaultXform', prim_type='Cube')
-        omni.kit.commands.execute('MovePrim',
-            path_from=result,
-            path_to=cube_prim_path)
+        omni.kit.commands.execute('MovePrim', path_from=result, path_to=board_prim_path)
         result = omni.kit.commands.execute('BindMaterialCommand',
-            prim_path=cube_prim_path,
+            prim_path=board_prim_path,
             material_path=str(self.shelf_mtl_path),
             strength='strongerThanDescendants')
-        
-        tx_scale_y = self.depth / width
-        # shader_prim = self._stage.GetPrimAtPath(mtl_path.AppendPath("Shader"))
-        # tx_scale_attr = shader_prim.CreateAttribute("inputs:texture_scale", Sdf.ValueTypeNames.Float2)
-        # tx_scale_attr.Set((1.0, tx_scale_y))
-        cube_prim = self._stage.GetPrimAtPath(cube_prim_path)
-        uv_attr = cube_prim.GetAttribute("primvars:st")
-        uvs = uv_attr.Get()
-        for x in range(len(uvs)):
-            uvs[x] = (uvs[x][0], uvs[x][1] * tx_scale_y)
-        uv_attr.Set(uvs)
+
+        cube_prim = self._stage.GetPrimAtPath(board_prim_path)
         points_attr = cube_prim.GetAttribute("points")
-        scaled_points = []
-        for point in CUBE_POINTS_TEMPLATE:
-            x = width / 2 * point[0]
-            y = self.thickness / 2 * point[1]
-            z = self.depth / 2 * point[2]
-            scale = stage_up_adjust(self._stage, [x, y, z], Gf.Vec3d)
-            scaled_points.append(scale)
+        scaled_points = [
+            stage_up_adjust(self._stage, [width / 2 * p[0], self.thickness / 2 * p[1], depth / 2 * p[2]], Gf.Vec3d)
+            for p in CUBE_POINTS_TEMPLATE
+        ]
+        points_attr.Set(scaled_points)
+        return cube_prim
+    
+    # TODO:
+    # Study material assignment and scaling
+    def create_facade(self, width, height, offset, axis, mtl):
+        # Create the facade as a Cube instead of a Plane for consistency with create_board
+        facade_prim_path = omni.usd.get_stage_next_free_path(self._stage, self.geom_scope_path.AppendPath("Facade"), False)
+        success, result = omni.kit.commands.execute('CreateMeshPrimWithDefaultXform', prim_type='Cube')
+        # Move this result to facade prim path
+        omni.kit.commands.execute('MovePrim', path_from=result, path_to=facade_prim_path)
+
+        facade_prim = self._stage.GetPrimAtPath(facade_prim_path)
+
+        # Scale the cube points to match the facade dimensions
+        points_attr = facade_prim.GetAttribute("points")
+        # points_attr: Usd.Prim(</World/Bookshelf/Geometry/Facade>).GetAttribute('points')
+
+        scaled_points = [
+            stage_up_adjust(self._stage, [width / 2 * p[0], height / 2 * p[1], self.thickness / 2 * p[2]], Gf.Vec3d)
+            for p in CUBE_POINTS_TEMPLATE
+        ]
+
+        # Set the facade's points to scaled_points
         points_attr.Set(scaled_points)
 
-        return cube_prim
+        # Position the facade
+        translate = stage_up_adjust(self._stage, offset, Gf.Vec3d)
+        rotate = Gf.Vec3d(0, 0, 0)  # Default no rotation
+
+        if axis == "front":
+            pass  # No additional rotation needed
+        elif axis == "side":
+            rotate = Gf.Vec3d(0, -90, 0)  # Rotate for side walls
+
+        facade_prim.GetAttribute("xformOp:translate").Set(translate)
+        facade_prim.GetAttribute("xformOp:rotateXYZ").Set(rotate)
+
+        # Assign the same material as the boards
+        omni.kit.commands.execute(
+            'BindMaterialCommand',
+            prim_path=facade_prim_path,
+            material_path=str(mtl),
+            strength='strongerThanDescendants'
+        )
+
+        return facade_prim
+    
+    def generate_window_pattern(self, facade_prim, num_windows_width, num_windows_height):
+        uv_attr = facade_prim.GetAttribute("primvars:st")
+        uvs = uv_attr.Get()
+
+        window_width = 1.0 / num_windows_width
+        window_height = 1.0 / num_windows_height
+
+        for i in range(num_windows_width):
+            for j in range(num_windows_height):
+                window_uv = [
+                    [i * window_width, j * window_height],
+                    [(i + 1) * window_width, j * window_height],
+                    [(i + 1) * window_width, (j + 1) * window_height],
+                    [i * window_width, (j + 1) * window_height],
+                ]
+                # Modify UVs here to add a window texture or leave gaps in the facade mesh
+                pass
+
+    def create_roof(self, width, depth):
+        roof_prim_path = omni.usd.get_stage_next_free_path(self._stage, self.geom_scope_path.AppendPath("Roof"), False)
+        success, result = omni.kit.commands.execute('CreateMeshPrimWithDefaultXform', prim_type='Plane')
+        omni.kit.commands.execute('MovePrim', path_from=result, path_to=roof_prim_path)
+
+        roof_prim = self._stage.GetPrimAtPath(roof_prim_path)
+        points_attr = roof_prim.GetAttribute("points")
+        scaled_points = [
+            stage_up_adjust(self._stage, [(width + self.thickness) / 2 * p[0], 0, (depth + self.thickness) / 2 * p[2]], Gf.Vec3d)
+            for p in CUBE_POINTS_TEMPLATE[:4]
+        ]
+        points_attr.Set(scaled_points)
+
+        translate = stage_up_adjust(self._stage, [0, self.height + self.thickness / 2, 0], Gf.Vec3d)
+        roof_prim.GetAttribute("xformOp:translate").Set(translate)
+        return roof_prim
 
 
 
@@ -316,5 +425,5 @@ class BookshelfGenerator:
 
 
 
-        
+
 
