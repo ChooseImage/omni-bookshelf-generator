@@ -201,10 +201,10 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         self.create_frame()
-        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front")
-        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front")
-        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side")
-        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side")
+        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front", self.concrete_mtl_path)
+        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front", self.concrete_mtl_path)
+        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side", self.concrete_mtl_path)
+        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side", self.concrete_mtl_path)
         self.create_roof(self.width, self.depth)  # Roof
         self.create_shelves(self.num_shelves)
         omni.usd.get_context().get_selection().clear_selected_prim_paths()
@@ -328,7 +328,7 @@ class BookshelfGenerator:
     
     # TODO:
     # Study material assignment and scaling
-    def create_facade(self, width, height, offset, axis):
+    def create_facade(self, width, height, offset, axis, mtl):
         # Create the facade as a Cube instead of a Plane for consistency with create_board
         facade_prim_path = omni.usd.get_stage_next_free_path(self._stage, self.geom_scope_path.AppendPath("Facade"), False)
         success, result = omni.kit.commands.execute('CreateMeshPrimWithDefaultXform', prim_type='Cube')
@@ -356,7 +356,7 @@ class BookshelfGenerator:
         if axis == "front":
             pass  # No additional rotation needed
         elif axis == "side":
-            rotate = Gf.Vec3d(0, 90, 0)  # Rotate for side walls
+            rotate = Gf.Vec3d(0, -90, 0)  # Rotate for side walls
 
         facade_prim.GetAttribute("xformOp:translate").Set(translate)
         facade_prim.GetAttribute("xformOp:rotateXYZ").Set(rotate)
@@ -365,7 +365,7 @@ class BookshelfGenerator:
         omni.kit.commands.execute(
             'BindMaterialCommand',
             prim_path=facade_prim_path,
-            material_path=str(self.concrete_mtl_path),
+            material_path=str(mtl),
             strength='strongerThanDescendants'
         )
 
@@ -413,5 +413,5 @@ class BookshelfGenerator:
 
 
 
-        
+
 
