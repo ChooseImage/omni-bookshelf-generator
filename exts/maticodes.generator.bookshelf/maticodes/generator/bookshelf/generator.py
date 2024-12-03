@@ -74,6 +74,17 @@ class BookshelfGenerator:
             new_selected_paths=[str(self.concrete_mtl_path)],
             expand_in_stage=True)
 
+    def create_tile_material(self, looks_scope_path):
+        self.tile_mtl_path = Sdf.Path(omni.usd.get_stage_next_free_path(self._stage, looks_scope_path.AppendPath("Concrete"), False))
+        result = omni.kit.commands.execute('CreateMdlMaterialPrimCommand',
+            mtl_url='http://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/vMaterials_2/Ceramic/Ceramic_Tiles_Glazed_Mosaic_Shifted.mdl',
+            mtl_name='Ceramic_Tiles_Mosaic_Shifted_White_Worn_Matte',
+            mtl_path=str(self.tile_mtl_path))
+        
+        omni.kit.commands.execute('SelectPrims',
+            old_selected_paths=[],
+            new_selected_paths=[str(self.tile_mtl_path)],
+            expand_in_stage=True)
 
     @property
     def books_instancer_path(self):
@@ -92,6 +103,7 @@ class BookshelfGenerator:
         omni.kit.commands.execute('CreatePrim', prim_type='Scope', prim_path=str(self.looks_scope_path))
         self.create_shelf_material(self.looks_scope_path)
         self.create_concrete_material(self.looks_scope_path)
+        self.create_tile_material(self.looks_scope_path)
         prototypes_container_path = self.geom_scope_path.AppendPath("Prototypes")
 
         self.width = 150
@@ -201,10 +213,10 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         self.create_frame()
-        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front", self.concrete_mtl_path)
-        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front", self.concrete_mtl_path)
-        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side", self.concrete_mtl_path)
-        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side", self.concrete_mtl_path)
+        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front", self.tile_mtl_path)
+        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front", self.tile_mtl_path)
+        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
+        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
         self.create_roof(self.width, self.depth)  # Roof
         self.create_shelves(self.num_shelves)
         omni.usd.get_context().get_selection().clear_selected_prim_paths()
