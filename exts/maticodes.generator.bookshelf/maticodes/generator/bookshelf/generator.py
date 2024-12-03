@@ -61,6 +61,19 @@ class BookshelfGenerator:
             old_selected_paths=[],
             new_selected_paths=[str(self.shelf_mtl_path)],
             expand_in_stage=True)
+        
+    def create_concrete_material(self, looks_scope_path):
+        self.concrete_mtl_path = Sdf.Path(omni.usd.get_stage_next_free_path(self._stage, looks_scope_path.AppendPath("Concrete"), False))
+        result = omni.kit.commands.execute('CreateMdlMaterialPrimCommand',
+            mtl_url='http://omniverse-content-production.s3-us-west-2.amazonaws.com/Materials/Base/Masonry/Concrete_Polished.mdl',
+            mtl_name='Concrete_Polished',
+            mtl_path=str(self.concrete_mtl_path))
+        
+        omni.kit.commands.execute('SelectPrims',
+            old_selected_paths=[],
+            new_selected_paths=[str(self.concrete_mtl_path)],
+            expand_in_stage=True)
+
 
     @property
     def books_instancer_path(self):
@@ -78,6 +91,7 @@ class BookshelfGenerator:
         omni.kit.commands.execute('CreatePrim', prim_type='Scope', prim_path=str(self.geom_scope_path))
         omni.kit.commands.execute('CreatePrim', prim_type='Scope', prim_path=str(self.looks_scope_path))
         self.create_shelf_material(self.looks_scope_path)
+        self.create_concrete_material(self.looks_scope_path)
         prototypes_container_path = self.geom_scope_path.AppendPath("Prototypes")
 
         self.width = 150
@@ -312,20 +326,27 @@ class BookshelfGenerator:
         points_attr.Set(scaled_points)
         return cube_prim
     
+    # TODO:
+    # Study material assignment and scaling
     def create_facade(self, width, height, offset, axis):
         # Create the facade as a Cube instead of a Plane for consistency with create_board
         facade_prim_path = omni.usd.get_stage_next_free_path(self._stage, self.geom_scope_path.AppendPath("Facade"), False)
         success, result = omni.kit.commands.execute('CreateMeshPrimWithDefaultXform', prim_type='Cube')
+        # Move this result to facade prim path
         omni.kit.commands.execute('MovePrim', path_from=result, path_to=facade_prim_path)
 
         facade_prim = self._stage.GetPrimAtPath(facade_prim_path)
 
         # Scale the cube points to match the facade dimensions
         points_attr = facade_prim.GetAttribute("points")
+        # points_attr: Usd.Prim(</World/Bookshelf/Geometry/Facade>).GetAttribute('points')
+
         scaled_points = [
             stage_up_adjust(self._stage, [width / 2 * p[0], height / 2 * p[1], self.thickness / 2 * p[2]], Gf.Vec3d)
             for p in CUBE_POINTS_TEMPLATE
         ]
+
+        # Set the facade's points to scaled_points
         points_attr.Set(scaled_points)
 
         # Position the facade
@@ -344,7 +365,7 @@ class BookshelfGenerator:
         omni.kit.commands.execute(
             'BindMaterialCommand',
             prim_path=facade_prim_path,
-            material_path=str(self.shelf_mtl_path),
+            material_path=str(self.concrete_mtl_path),
             strength='strongerThanDescendants'
         )
 
