@@ -199,7 +199,7 @@ class BookshelfGenerator:
 
         container_prim.SetSpecifier(Sdf.SpecifierOver)
 
-    def generate(self, width=100, height=250, depth=20, thickness=2, num_shelves=3, randomize_scale=True):
+    def generate(self, width=100, height=250, depth=20, thickness=2, num_shelves=3, randomize_scale=True, num_buildings=20, spacing=200):
         self.width = width
         self.height = height
         self.depth = depth
@@ -213,7 +213,10 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         self.create_frame()
-        self.create_building_exterior(self.width, self.height, self.depth, self.tile_mtl_path)
+        
+        # Call the method to generate multiple buildings instead of one
+        self.generate_multiple_buildings(num_buildings=num_buildings, width=width, height=height, depth=depth, spacing=spacing)
+        
         self.create_roof(self.width, self.depth)  # Roof
         self.create_shelves(self.num_shelves)
         omni.usd.get_context().get_selection().clear_selected_prim_paths()
@@ -380,11 +383,31 @@ class BookshelfGenerator:
 
         return facade_prim
     
-    def create_building_exterior(self, width, height, depth, mtl):
-        self.create_facade(width, height, [0, height / 2, depth / 2], "front", mtl)
-        self.create_facade(width, height, [0, height / 2, depth / 2], "front", mtl)
-        self.create_facade(depth, height, [width / 2, height / 2, 0], "side", mtl)
-        self.create_facade(depth, height, [width / 2, height / 2, 0], "side", mtl)
+    def create_building_exterior(self, width, height, depth, mtl, offset=[0, 0, 0]):    
+        # Adjust positions with the provided offset
+        front_offset = [0 + offset[0], height / 2 + offset[1], depth / 2 + offset[2]]
+        back_offset = [0 + offset[0], height / 2 + offset[1], -depth / 2 + offset[2]]
+        left_offset = [-width / 2 + offset[0], height / 2 + offset[1], 0 + offset[2]]
+        right_offset = [width / 2 + offset[0], height / 2 + offset[1], 0 + offset[2]]
+    
+        # Create facades
+        self.create_facade(width, height, front_offset, "front", mtl)
+        self.create_facade(width, height, back_offset, "front", mtl)
+        self.create_facade(depth, height, left_offset, "side", mtl)
+        self.create_facade(depth, height, right_offset, "side", mtl)
+
+    def generate_multiple_buildings(self, num_buildings=20, width=100, height=250, depth=20, spacing=200):
+        buildings = []
+        for i in range(num_buildings):
+            # Calculate an offset for each building
+            offset_x = (i % 5) * spacing  # Arrange buildings in rows of 5
+            offset_y = 0                 # Same level for all buildings
+            offset_z = (i // 5) * spacing  # Move to the next row every 5 buildings
+            offset = [offset_x, offset_y, offset_z]
+
+            # Generate a building with the calculated offset
+            self.create_building_exterior(width, height, depth, self.tile_mtl_path, offset=offset)
+            buildings.append(offset)  # Store offsets for reference or further use
     
     def generate_window_pattern(self, facade_prim, num_windows_width, num_windows_height):
         uv_attr = facade_prim.GetAttribute("primvars:st")
