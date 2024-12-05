@@ -213,10 +213,7 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         self.create_frame()
-        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front", self.tile_mtl_path)
-        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front", self.tile_mtl_path)
-        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
-        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
+        self.create_building_exterior(self.width, self.height, self.depth, self.tile_mtl_path)
         self.create_roof(self.width, self.depth)  # Roof
         self.create_shelves(self.num_shelves)
         omni.usd.get_context().get_selection().clear_selected_prim_paths()
@@ -382,6 +379,12 @@ class BookshelfGenerator:
         )
 
         return facade_prim
+    
+    def create_building_exterior(self, width, height, depth, mtl):
+        self.create_facade(width, height, [0, height / 2, depth / 2], "front", mtl)
+        self.create_facade(width, height, [0, height / 2, depth / 2], "front", mtl)
+        self.create_facade(depth, height, [width / 2, height / 2, 0], "side", mtl)
+        self.create_facade(depth, height, [width / 2, height / 2, 0], "side", mtl)
     
     def generate_window_pattern(self, facade_prim, num_windows_width, num_windows_height):
         uv_attr = facade_prim.GetAttribute("primvars:st")
