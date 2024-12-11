@@ -10,6 +10,7 @@ import omni.kit.app
 import omni.kit.commands
 import omni.usd
 from omni.kit.property.usd.prim_selection_payload import PrimSelectionPayload
+from omni.kit.viewport.utility import get_active_viewport, frame_viewport_selection
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 from .utils import stage_up_adjust
@@ -19,6 +20,7 @@ CUBE_POINTS_TEMPLATE = [(-1, -1, -1), (1, -1, -1), (-1, -1, 1), (1, -1, 1), (-1,
 
 class BookshelfGenerator:
     def __init__(self, asset_root_path: typing.Union[str, Sdf.Path]=None) -> None:
+        self.ctx = omni.usd.get_context()
         self._stage:Usd.Stage = omni.usd.get_context().get_stage()
         if asset_root_path is None:
             self.create_new()
@@ -87,16 +89,42 @@ class BookshelfGenerator:
             expand_in_stage=True)
 
     @staticmethod    
-    def create_perspective_camera(stage: Usd.Stage, prim_path: str="/World/MyPerspCam") -> UsdGeom.Camera:
-        print(f"--- Create Perspective Cam --- Stage {stage}")
-        print(f"Prim path: {prim_path}, Type: {type(prim_path)}")
+    def create_perspective_camera(stage: Usd.Stage, prim_path: str="/World/Camera_1") -> UsdGeom.Camera:
         camera_path = Sdf.Path(prim_path)
-        print(f"---- cam path: {camera_path} ----")
         usd_camera: UsdGeom.Camera = UsdGeom.Camera.Define(stage, camera_path)
-        print(f"---- usd_camera_original: {usd_camera} ----")
         usd_camera.CreateProjectionAttr().Set(UsdGeom.Tokens.perspective)
-        print(f"---- usd_camera ---- {usd_camera}")
         return usd_camera
+    
+    @staticmethod
+    def frame_camera(stage: Usd.Stage, camera: UsdGeom.Camera, target_prim_path: str, zoom: float = 0.6) -> None:
+        """
+        Frames the specified prim in the viewport using the given camera.
+
+        Args:
+            stage (Usd.Stage): The USD stage containing the camera and the target prim.
+            camera (UsdGeom.Camera): The camera to adjust.
+            target_prim_path (str): The path to the prim to frame.
+            zoom (float): The zoom level for the camera framing.
+        """
+        from omni.kit.viewport.utility import get_active_viewport
+        from pxr import Usd
+        
+        # Get the active viewport or set up default camera settings
+        active_viewport = get_active_viewport()
+        time = active_viewport.time if active_viewport else Usd.TimeCode.Default()
+        resolution = active_viewport.resolution if active_viewport else (1, 1)
+        aspect_ratio = resolution[0] / resolution[1]
+        print(f"-------------- framing camera: {camera}, {target_prim_path}, {zoom}")
+        # Frame the target prim using the camera
+        omni.kit.commands.execute(
+            'FramePrimsCommand',
+            prim_to_move=str(camera.GetPath()),
+            prims_to_frame=[target_prim_path],
+            time_code=time,
+            aspect_ratio=aspect_ratio,
+            zoom=zoom,
+        )
+
 
     @property
     def books_instancer_path(self):
@@ -230,7 +258,8 @@ class BookshelfGenerator:
         self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=5, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
         
         # Create camera
-        self.create_perspective_camera(self._stage)
+        camera = self.create_perspective_camera(self._stage)
+        self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
 
         # Add shelves and other configurations
         self.create_shelves(self.num_shelves)
