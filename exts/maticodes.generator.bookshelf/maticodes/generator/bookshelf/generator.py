@@ -10,6 +10,7 @@ import omni.kit.app
 import omni.kit.commands
 import omni.usd
 from omni.kit.property.usd.prim_selection_payload import PrimSelectionPayload
+from omni.kit.viewport.utility import get_active_viewport, frame_viewport_selection
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 from .utils import stage_up_adjust
@@ -19,6 +20,7 @@ CUBE_POINTS_TEMPLATE = [(-1, -1, -1), (1, -1, -1), (-1, -1, 1), (1, -1, 1), (-1,
 
 class BookshelfGenerator:
     def __init__(self, asset_root_path: typing.Union[str, Sdf.Path]=None) -> None:
+        self.ctx = omni.usd.get_context()
         self._stage:Usd.Stage = omni.usd.get_context().get_stage()
         if asset_root_path is None:
             self.create_new()
@@ -85,6 +87,44 @@ class BookshelfGenerator:
             old_selected_paths=[],
             new_selected_paths=[str(self.tile_mtl_path)],
             expand_in_stage=True)
+
+    @staticmethod    
+    def create_perspective_camera(stage: Usd.Stage, prim_path: str="/World/Camera_1") -> UsdGeom.Camera:
+        camera_path = Sdf.Path(prim_path)
+        usd_camera: UsdGeom.Camera = UsdGeom.Camera.Define(stage, camera_path)
+        usd_camera.CreateProjectionAttr().Set(UsdGeom.Tokens.perspective)
+        return usd_camera
+    
+    @staticmethod
+    def frame_camera(stage: Usd.Stage, camera: UsdGeom.Camera, target_prim_path: str, zoom: float = 0.6) -> None:
+        """
+        Frames the specified prim in the viewport using the given camera.
+
+        Args:
+            stage (Usd.Stage): The USD stage containing the camera and the target prim.
+            camera (UsdGeom.Camera): The camera to adjust.
+            target_prim_path (str): The path to the prim to frame.
+            zoom (float): The zoom level for the camera framing.
+        """
+        from omni.kit.viewport.utility import get_active_viewport
+        from pxr import Usd
+        
+        # Get the active viewport or set up default camera settings
+        active_viewport = get_active_viewport()
+        time = active_viewport.time if active_viewport else Usd.TimeCode.Default()
+        resolution = active_viewport.resolution if active_viewport else (1, 1)
+        aspect_ratio = resolution[0] / resolution[1]
+        print(f"-------------- framing camera: {camera}, {target_prim_path}, {zoom}")
+        # Frame the target prim using the camera
+        omni.kit.commands.execute(
+            'FramePrimsCommand',
+            prim_to_move=str(camera.GetPath()),
+            prims_to_frame=[target_prim_path],
+            time_code=time,
+            aspect_ratio=aspect_ratio,
+            zoom=zoom,
+        )
+
 
     @property
     def books_instancer_path(self):
@@ -199,7 +239,7 @@ class BookshelfGenerator:
 
         container_prim.SetSpecifier(Sdf.SpecifierOver)
 
-    def generate(self, width=100, height=250, depth=20, thickness=2, num_shelves=3, randomize_scale=True):
+    def generate(self, width=100, height=250, depth=20, thickness=2, num_shelves=3, randomize_scale=True, num_blocks=4, block_spacing=400, building_spacing=200):
         self.width = width
         self.height = height
         self.depth = depth
@@ -213,11 +253,15 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         self.create_frame()
-        self.create_facade(self.width, self.height, [0, self.height / 2, -self.depth / 2], "front", self.tile_mtl_path)
-        self.create_facade(self.width, self.height, [0, self.height / 2, self.depth / 2], "front", self.tile_mtl_path)
-        self.create_facade(self.depth, self.height, [-self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
-        self.create_facade(self.depth, self.height, [self.width / 2, self.height / 2, 0], "side", self.tile_mtl_path)
-        self.create_roof(self.width, self.depth)  # Roof
+    
+        # Call the method to generate buildings with streets
+        self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=5, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
+        
+        # Create camera
+        camera = self.create_perspective_camera(self._stage)
+        self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
+
+        # Add shelves and other configurations
         self.create_shelves(self.num_shelves)
         omni.usd.get_context().get_selection().clear_selected_prim_paths()
 
@@ -382,6 +426,77 @@ class BookshelfGenerator:
         )
 
         return facade_prim
+    
+    def create_building_exterior(self, width, height, depth, mtl, offset=[0, 0, 0]):    
+        # Adjust positions with the provided offset
+        front_offset = [0 + offset[0], height / 2 + offset[1], depth / 2 + offset[2]]
+        back_offset = [0 + offset[0], height / 2 + offset[1], -depth / 2 + offset[2]]
+        left_offset = [-width / 2 + offset[0], height / 2 + offset[1], 0 + offset[2]]
+        right_offset = [width / 2 + offset[0], height / 2 + offset[1], 0 + offset[2]]
+    
+        # Create facades
+        self.create_facade(width, height, front_offset, "front", mtl)
+        self.create_facade(width, height, back_offset, "front", mtl)
+        self.create_facade(depth, height, left_offset, "side", mtl)
+        self.create_facade(depth, height, right_offset, "side", mtl)
+
+        # Add a roof
+        roof_offset = [0 + offset[0], height + offset[1], 0 + offset[2]]
+        self.create_roof(width, depth).GetAttribute("xformOp:translate").Set(stage_up_adjust(self._stage, roof_offset, Gf.Vec3d))
+
+    def generate_multiple_buildings(self, num_blocks=4, buildings_per_block=5, width=100, height=250, depth=20, block_spacing=None, building_spacing=None):
+        """
+        Generates buildings in a 2x2 grid layout where each block contains a row of 5 buildings.
+    
+        Args:
+            num_blocks (int): Number of blocks (default is 4 for 2x2 grid).
+            buildings_per_block (int): Number of buildings per block.
+            width (int): Width of each building.
+            height (int): Height of each building.
+            depth (int): Depth of each building.
+            block_spacing (int): Spacing between blocks. Defaults to the total width of a block + a gap for streets.
+            building_spacing (int): Spacing between buildings within a block. Defaults to 1.5 times the building width.
+        """
+        if building_spacing is None:
+            building_spacing = width * 1.5  # Default to 1.5 times the building width
+    
+        # Calculate the total width of a block
+        block_width = (width + building_spacing) * buildings_per_block - building_spacing
+    
+        if block_spacing is None:
+            block_spacing = block_width + width * 2  # Add an additional gap for streets
+    
+        blocks = []
+        block_rows = 2  # Fixed for 2x2 grid
+        block_cols = 2  # Fixed for 2x2 grid
+    
+        for block_row in range(block_rows):
+            for block_col in range(block_cols):
+                # Determine block position
+                block_offset_x = block_col * block_spacing
+                block_offset_z = block_row * block_spacing
+    
+                # Generate buildings in the block
+                for i in range(buildings_per_block):
+                    # Calculate position of each building within the block
+                    building_offset_x = i * (width + building_spacing)
+                    building_offset_z = 0  # All buildings in a block are aligned in a row
+                    
+                    offset = [
+                        block_offset_x + building_offset_x,
+                        0,  # Same level for all buildings
+                        block_offset_z + building_offset_z,
+                    ]
+                    print(f"----offset: {offset}")
+    
+                    # Generate a building with the calculated offset
+                    self.create_building_exterior(width, height, depth, self.tile_mtl_path, offset=offset)
+    
+                # Store block offsets for reference
+                blocks.append((block_row, block_col))
+    
+        print(f"Generated blocks with block_spacing={block_spacing}, building_spacing={building_spacing}: {blocks}")
+        return blocks
     
     def generate_window_pattern(self, facade_prim, num_windows_width, num_windows_height):
         uv_attr = facade_prim.GetAttribute("primvars:st")
