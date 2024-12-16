@@ -88,13 +88,45 @@ class BookshelfGenerator:
             new_selected_paths=[str(self.tile_mtl_path)],
             expand_in_stage=True)
 
-    @staticmethod    
-    def create_perspective_camera(stage: Usd.Stage, prim_path: str="/World/Camera_1") -> UsdGeom.Camera:
+    @staticmethod
+    def create_perspective_camera(stage: Usd.Stage, prim_path: str = "/World/Camera_1", start_position=(7000, 400, -800)) -> UsdGeom.Camera:
+        """
+        Creates a perspective camera at the specified position.
+
+        Args:
+            stage (Usd.Stage): The USD stage where the camera will be created.
+            prim_path (str): The USD path for the camera.
+            start_position (tuple): The starting position (x, y, z) for the camera.
+
+        Returns:
+            UsdGeom.Camera: The created camera object.
+        """
         camera_path = Sdf.Path(prim_path)
         usd_camera: UsdGeom.Camera = UsdGeom.Camera.Define(stage, camera_path)
         usd_camera.CreateProjectionAttr().Set(UsdGeom.Tokens.perspective)
+
+        # Access the underlying prim and set the xformOp:translate attribute
+        camera_prim = usd_camera.GetPrim()
+        translate_attr = camera_prim.GetAttribute("xformOp:translate")
+
+        # Ensure the attribute exists; if not, create it
+        if not translate_attr:
+            print(f'------no translate_attr')
+            translate_attr = camera_prim.CreateAttribute("xformOp:translate", Sdf.ValueTypeNames.Double3)
+
+        # Set the camera's initial position
+        translate_target = Gf.Vec3d(*start_position)
+        print(f'-------- translate target: {translate_target}')
+        translate_attr.Set(translate_target)
+
+        camera = stage.GetPrimAtPath("/World/Camera_1")
+        print(f'----------GEN camera attr: {camera.GetAttribute("xformOp:translate")}')
+        camera.GetAttribute("xformOp:translate").Set(translate_target)
+        print(f'--------- camera: {camera}')
+        print(f'--------- usd_camera: {usd_camera}')
+
         return usd_camera
-    
+
     @staticmethod
     def frame_camera(stage: Usd.Stage, camera: UsdGeom.Camera, target_prim_path: str, zoom: float = 0.6) -> None:
         """
@@ -239,7 +271,7 @@ class BookshelfGenerator:
 
         container_prim.SetSpecifier(Sdf.SpecifierOver)
 
-    def generate(self, width=100, height=250, depth=20, thickness=2, num_shelves=3, randomize_scale=True, num_blocks=4, block_spacing=400, building_spacing=200):
+    def generate(self, width=100, height=250, depth=20, thickness=2, num_shelves=3, randomize_scale=True, num_blocks=4, block_spacing=250, building_spacing=200):
         self.width = width
         self.height = height
         self.depth = depth
@@ -251,14 +283,15 @@ class BookshelfGenerator:
         self.scales = []
         self.proto_ids = []
         self.get_prototype_attrs()
-        self.clear_boards()
-        self.create_frame()
+        #self.clear_boards()
+        #self.create_frame()
     
         # Call the method to generate buildings with streets
-        self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=5, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
+        #self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=5, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
         
         # Create camera
-        camera = self.create_perspective_camera(self._stage)
+        # Create the camera with the desired starting position
+        camera = self.create_perspective_camera(self._stage, start_position=(7000, 400, -800))
         self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
         start_frame = 1
         end_frame = 100
@@ -269,8 +302,8 @@ class BookshelfGenerator:
         #self.animate_camera(self._stage, camera, start_frame, end_frame, end_position, target_prim_path)
 
         # Add shelves and other configurations
-        self.create_shelves(self.num_shelves)
-        omni.usd.get_context().get_selection().clear_selected_prim_paths()
+        #self.create_shelves(self.num_shelves)
+        #omni.usd.get_context().get_selection().clear_selected_prim_paths()
 
         timeline = omni.timeline.get_timeline_interface()
         print(f'----------timeline before: {timeline}-----------')
@@ -518,10 +551,10 @@ class BookshelfGenerator:
         roof_offset = [0 + offset[0], height + offset[1], 0 + offset[2]]
         self.create_roof(width, depth).GetAttribute("xformOp:translate").Set(stage_up_adjust(self._stage, roof_offset, Gf.Vec3d))
 
-    def generate_multiple_buildings(self, num_blocks=4, buildings_per_block=5, width=100, height=250, depth=20, block_spacing=None, building_spacing=None):
+    def generate_multiple_buildings(self, num_blocks=4, buildings_per_block=5, width=100, height=250, depth=20, block_spacing=None, building_spacing=None, target_center=(-1000, 0, 0)):
         """
-        Generates buildings in a 2x2 grid layout where each block contains a row of 5 buildings.
-    
+        Generates buildings in a 2x2 grid layout, centered at the target position.
+
         Args:
             num_blocks (int): Number of blocks (default is 4 for 2x2 grid).
             buildings_per_block (int): Number of buildings per block.
@@ -530,46 +563,58 @@ class BookshelfGenerator:
             depth (int): Depth of each building.
             block_spacing (int): Spacing between blocks. Defaults to the total width of a block + a gap for streets.
             building_spacing (int): Spacing between buildings within a block. Defaults to 1.5 times the building width.
+            target_center (tuple): The target (x, y, z) position to center the grid.
         """
         if building_spacing is None:
             building_spacing = width * 1.5  # Default to 1.5 times the building width
-    
-        # Calculate the total width of a block
+
+        # Calculate the total width and depth of a block
         block_width = (width + building_spacing) * buildings_per_block - building_spacing
-    
         if block_spacing is None:
             block_spacing = block_width + width * 2  # Add an additional gap for streets
-    
+
+        # Calculate total grid size
+        block_rows, block_cols = 2, 2  # Fixed for a 2x2 grid
+        total_width = block_cols * block_width + (block_cols - 1) * block_spacing
+        total_depth = block_rows * block_width + (block_rows - 1) * block_spacing
+
+        # Calculate grid center offset to align with the target center
+        grid_center_x = total_width / 2
+        grid_center_z = total_depth / 2
+        offset_x = target_center[0] - grid_center_x
+        offset_z = target_center[2] - grid_center_z
+        print(f"Recenter offsets: offset_x={offset_x}, offset_z={offset_z}")
+
+        # Generate blocks and buildings
         blocks = []
-        block_rows = 2  # Fixed for 2x2 grid
-        block_cols = 2  # Fixed for 2x2 grid
-    
         for block_row in range(block_rows):
             for block_col in range(block_cols):
                 # Determine block position
-                block_offset_x = block_col * block_spacing
-                block_offset_z = block_row * block_spacing
-    
+                block_offset_x = block_col * (block_width + block_spacing) + offset_x
+                block_offset_z = block_row * (block_width + block_spacing) + offset_z
+
                 # Generate buildings in the block
                 for i in range(buildings_per_block):
                     # Calculate position of each building within the block
                     building_offset_x = i * (width + building_spacing)
                     building_offset_z = 0  # All buildings in a block are aligned in a row
-                    
+
+                    # Combine offsets
                     offset = [
                         block_offset_x + building_offset_x,
-                        0,  # Same level for all buildings
+                        target_center[1],  # Y remains constant
                         block_offset_z + building_offset_z,
                     ]
-                    print(f"----offset: {offset}")
-    
+
+                    print(f"Building offset: {offset}")
+
                     # Generate a building with the calculated offset
                     self.create_building_exterior(width, height, depth, self.tile_mtl_path, offset=offset)
-    
+
                 # Store block offsets for reference
                 blocks.append((block_row, block_col))
-    
-        print(f"Generated blocks with block_spacing={block_spacing}, building_spacing={building_spacing}: {blocks}")
+
+        print(f"Generated blocks centered at {target_center} with block_spacing={block_spacing}, building_spacing={building_spacing}")
         return blocks
     
     def generate_window_pattern(self, facade_prim, num_windows_width, num_windows_height):
