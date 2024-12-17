@@ -101,31 +101,48 @@ class BookshelfGenerator:
         Returns:
             UsdGeom.Camera: The created camera object.
         """
+        '''
         camera_path = Sdf.Path(prim_path)
         usd_camera: UsdGeom.Camera = UsdGeom.Camera.Define(stage, camera_path)
         usd_camera.CreateProjectionAttr().Set(UsdGeom.Tokens.perspective)
 
-        # Access the underlying prim and set the xformOp:translate attribute
+        # Use XformCommonAPI to set the translation
+        xform_api = UsdGeom.XformCommonAPI(usd_camera.GetPrim())
+        start_position_vec = Gf.Vec3d(*start_position)
+        xform_api.SetTranslate(start_position_vec)
+    
+        # Verify the xformOp:translate attribute
         camera_prim = usd_camera.GetPrim()
+        camera_prim.GetAttribute("xformOp:translate").Set(start_position)
         translate_attr = camera_prim.GetAttribute("xformOp:translate")
-
-        # Ensure the attribute exists; if not, create it
-        if not translate_attr:
-            print(f'------no translate_attr')
-            translate_attr = camera_prim.CreateAttribute("xformOp:translate", Sdf.ValueTypeNames.Double3)
-
-        # Set the camera's initial position
-        translate_target = Gf.Vec3d(*start_position)
-        print(f'-------- translate target: {translate_target}')
-        translate_attr.Set(translate_target)
-
-        camera = stage.GetPrimAtPath("/World/Camera_1")
-        print(f'----------GEN camera attr: {camera.GetAttribute("xformOp:translate")}')
-        camera.GetAttribute("xformOp:translate").Set(translate_target)
-        print(f'--------- camera: {camera}')
-        print(f'--------- usd_camera: {usd_camera}')
-
+        print(f'----------- Created camera xformOp:translate attribute: {translate_attr}')
+    
+        # Ensure the value is set correctly
+        print(f'----------- Setting position to: {start_position_vec}')
+        print(f'----------- Attribute Value: {translate_attr.Get()}')
         return usd_camera
+        '''
+
+        omni.kit.commands.execute("CreatePrimWithDefaultXform",
+            prim_type="Camera",
+            prim_path=prim_path,
+            attributes={
+            "projection": UsdGeom.Tokens.perspective,
+            "focalLength": 35,
+            "horizontalAperture": 20.955,
+            "verticalAperture": 15.2908,
+            "clippingRange": (0.1, 100000)
+            }
+        )
+
+        camera_prim = stage.GetPrimAtPath(prim_path)
+
+        # Step 3: Set the xformOp:translate using Xformable
+        camera_prim.GetAttribute("xformOp:translate").Set(start_position)
+        #self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
+        #return camera_prim
+
+        
 
     @staticmethod
     def frame_camera(stage: Usd.Stage, camera: UsdGeom.Camera, target_prim_path: str, zoom: float = 0.6) -> None:
@@ -146,11 +163,12 @@ class BookshelfGenerator:
         time = active_viewport.time if active_viewport else Usd.TimeCode.Default()
         resolution = active_viewport.resolution if active_viewport else (1, 1)
         aspect_ratio = resolution[0] / resolution[1]
-        print(f"-------------- framing camera: {camera}, {target_prim_path}, {zoom}")
+        #print(f"-------------- framing camera: {camera}, {target_prim_path}, {zoom}")
         # Frame the target prim using the camera
+        print(f'----------- framing camera: {camera}')
         omni.kit.commands.execute(
             'FramePrimsCommand',
-            prim_to_move=str(camera.GetPath()),
+            prim_to_move=str(camera.GetPath()), # here is the error
             prims_to_frame=[target_prim_path],
             time_code=time,
             aspect_ratio=aspect_ratio,
@@ -291,7 +309,8 @@ class BookshelfGenerator:
         
         # Create camera
         # Create the camera with the desired starting position
-        camera = self.create_perspective_camera(self._stage, start_position=(7000, 400, -800))
+        self.create_perspective_camera(self._stage, start_position=(7000, 400, -800))
+        camera = self._stage.GetPrimAtPath("/World/Camera_1")
         self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
         start_frame = 1
         end_frame = 100
@@ -306,10 +325,8 @@ class BookshelfGenerator:
         #omni.usd.get_context().get_selection().clear_selected_prim_paths()
 
         timeline = omni.timeline.get_timeline_interface()
-        print(f'----------timeline before: {timeline}-----------')
         #time_in_seconds = desired_frame / fps
         timeline.set_current_time(4)
-        print(f'----------timeline after: {timeline}--------------')
 
 
     def clear_boards(self):
@@ -583,7 +600,6 @@ class BookshelfGenerator:
         grid_center_z = total_depth / 2
         offset_x = target_center[0] - grid_center_x
         offset_z = target_center[2] - grid_center_z
-        print(f"Recenter offsets: offset_x={offset_x}, offset_z={offset_z}")
 
         # Generate blocks and buildings
         blocks = []
@@ -606,15 +622,12 @@ class BookshelfGenerator:
                         block_offset_z + building_offset_z,
                     ]
 
-                    print(f"Building offset: {offset}")
-
                     # Generate a building with the calculated offset
                     self.create_building_exterior(width, height, depth, self.tile_mtl_path, offset=offset)
 
                 # Store block offsets for reference
                 blocks.append((block_row, block_col))
 
-        print(f"Generated blocks centered at {target_center} with block_spacing={block_spacing}, building_spacing={building_spacing}")
         return blocks
     
     def generate_window_pattern(self, facade_prim, num_windows_width, num_windows_height):

@@ -88,6 +88,7 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     
                     stage = omni.usd.get_context().get_stage()
                     camera = stage.GetPrimAtPath("/World/Camera")
+                    print(f'--------- camera forward: {camera}')
                     xform = UsdGeom.Xformable(camera)
                     local_transformation: Gf.Matrix4d = xform.GetLocalTransformation()
                     # Apply the local matrix to the start and end points of the camera's default forward vector (-Z)
