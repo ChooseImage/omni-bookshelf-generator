@@ -88,59 +88,50 @@ class BookshelfGenerator:
             new_selected_paths=[str(self.tile_mtl_path)],
             expand_in_stage=True)
 
-    @staticmethod
-    def create_perspective_camera(stage: Usd.Stage, prim_path: str = "/World/Camera_1", start_position=(7000, 400, -800)) -> UsdGeom.Camera:
+    def create_perspective_camera(self, prim_path: str = "/World/Camera_1", start_position=(7000, 400, -800)) -> UsdGeom.Camera:
         """
         Creates a perspective camera at the specified position.
 
         Args:
-            stage (Usd.Stage): The USD stage where the camera will be created.
             prim_path (str): The USD path for the camera.
             start_position (tuple): The starting position (x, y, z) for the camera.
 
         Returns:
             UsdGeom.Camera: The created camera object.
         """
-        '''
-        camera_path = Sdf.Path(prim_path)
-        usd_camera: UsdGeom.Camera = UsdGeom.Camera.Define(stage, camera_path)
-        usd_camera.CreateProjectionAttr().Set(UsdGeom.Tokens.perspective)
-
-        # Use XformCommonAPI to set the translation
-        xform_api = UsdGeom.XformCommonAPI(usd_camera.GetPrim())
-        start_position_vec = Gf.Vec3d(*start_position)
-        xform_api.SetTranslate(start_position_vec)
-    
-        # Verify the xformOp:translate attribute
-        camera_prim = usd_camera.GetPrim()
-        camera_prim.GetAttribute("xformOp:translate").Set(start_position)
-        translate_attr = camera_prim.GetAttribute("xformOp:translate")
-        print(f'----------- Created camera xformOp:translate attribute: {translate_attr}')
-    
-        # Ensure the value is set correctly
-        print(f'----------- Setting position to: {start_position_vec}')
-        print(f'----------- Attribute Value: {translate_attr.Get()}')
-        return usd_camera
-        '''
-
-        omni.kit.commands.execute("CreatePrimWithDefaultXform",
+        # Step 1: Create the camera
+        omni.kit.commands.execute(
+            "CreatePrimWithDefaultXform",
             prim_type="Camera",
             prim_path=prim_path,
             attributes={
-            "projection": UsdGeom.Tokens.perspective,
-            "focalLength": 35,
-            "horizontalAperture": 20.955,
-            "verticalAperture": 15.2908,
-            "clippingRange": (0.1, 100000)
+                "projection": UsdGeom.Tokens.perspective,
+                "focalLength": 35,
+                "horizontalAperture": 20.955,
+                "verticalAperture": 15.2908,
+                "clippingRange": (0.1, 100000),
             }
         )
 
-        camera_prim = stage.GetPrimAtPath(prim_path)
+        # Step 2: Retrieve the camera prim
+        camera_prim = self._stage.GetPrimAtPath(prim_path)
+        if not camera_prim.IsValid():
+            raise ValueError(f"Camera prim at path {prim_path} could not be created or found.")
 
-        # Step 3: Set the xformOp:translate using Xformable
-        camera_prim.GetAttribute("xformOp:translate").Set(start_position)
-        #self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
-        #return camera_prim
+        # Step 3: Set the translation
+        camera_prim.GetAttribute("xformOp:translate").Set(Gf.Vec3d(*start_position))
+        omni.kit.commands.execute(
+            'ChangeProperty',
+            prop_path=Sdf.Path(f"{prim_path}.xformOp:rotateYXZ"),
+            value=Gf.Vec3f(0, 90, 0),  # Set to 0 (X), 90 (Y), 0 (Z)
+            prev=Gf.Vec3f(0, 0, 0)     # Previous rotation assumed to be (0, 0, 0)
+        )
+        
+
+        # Step 4: Frame the camera to the asset root
+        self.frame_camera(self._stage, UsdGeom.Camera(camera_prim), str(self.asset_root_path), zoom=0.2)
+
+        #return UsdGeom.Camera(camera_prim)
 
         
 
@@ -155,17 +146,14 @@ class BookshelfGenerator:
             target_prim_path (str): The path to the prim to frame.
             zoom (float): The zoom level for the camera framing.
         """
-        from omni.kit.viewport.utility import get_active_viewport
-        from pxr import Usd
         
         # Get the active viewport or set up default camera settings
         active_viewport = get_active_viewport()
         time = active_viewport.time if active_viewport else Usd.TimeCode.Default()
         resolution = active_viewport.resolution if active_viewport else (1, 1)
         aspect_ratio = resolution[0] / resolution[1]
-        #print(f"-------------- framing camera: {camera}, {target_prim_path}, {zoom}")
-        # Frame the target prim using the camera
-        print(f'----------- framing camera: {camera}')
+        '''
+        Will need to revisit framing logic, FramePrimsCommand will only "Move" the camera but not "rotate"
         omni.kit.commands.execute(
             'FramePrimsCommand',
             prim_to_move=str(camera.GetPath()), # here is the error
@@ -174,6 +162,8 @@ class BookshelfGenerator:
             aspect_ratio=aspect_ratio,
             zoom=zoom,
         )
+        '''
+        
 
 
     @property
@@ -301,17 +291,17 @@ class BookshelfGenerator:
         self.scales = []
         self.proto_ids = []
         self.get_prototype_attrs()
-        #self.clear_boards()
-        #self.create_frame()
+        self.clear_boards()
+        self.create_frame()
     
         # Call the method to generate buildings with streets
-        #self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=5, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
+        self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
         
         # Create camera
         # Create the camera with the desired starting position
-        self.create_perspective_camera(self._stage, start_position=(7000, 400, -800))
-        camera = self._stage.GetPrimAtPath("/World/Camera_1")
-        self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
+        self.create_perspective_camera(start_position=(5000, 400, -400))
+        #camera = self._stage.GetPrimAtPath("/World/Camera_1")
+        #self.frame_camera(self._stage, camera, str(self.asset_root_path), zoom=0.2)
         start_frame = 1
         end_frame = 100
         end_position = [50, 150, 50]  # Final position of the camera

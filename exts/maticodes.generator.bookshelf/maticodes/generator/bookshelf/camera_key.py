@@ -30,7 +30,6 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
             camera_path = "/World/Camera"
             UsdGeom.Camera.Define(stage, camera_path)
 
-        print(camera_path)
 
         # Start at 100
         self._MovementValue = 100
@@ -88,7 +87,6 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     
                     stage = omni.usd.get_context().get_stage()
                     camera = stage.GetPrimAtPath("/World/Camera")
-                    print(f'--------- camera forward: {camera}')
                     xform = UsdGeom.Xformable(camera)
                     local_transformation: Gf.Matrix4d = xform.GetLocalTransformation()
                     # Apply the local matrix to the start and end points of the camera's default forward vector (-Z)
@@ -108,10 +106,6 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     new_transform = local_transformation * offset_mat
                     # Extract the new translation
                     translate: Gf.Vec3d = new_transform.ExtractTranslation()
-                    print(f"----------Trasnlate: {translate}-----------")
-                    print(f"----------Type of translate: {type(translate)}----------")
-                    print(f"----------x: {translate[0]}, y: {translate[1]}, z: {translate[2]}----------")
-                    print(f"----------Repr of translate: {repr(translate)}----------")
                     # Update the attribute
                     camera.GetAttribute("xformOp:translate").Set(translate)
 
@@ -186,6 +180,7 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     rotationX = decomposed_Transform[1][0]
                     rotationY = decomposed_Transform[1][1]
                     rotationZ = decomposed_Transform[1][2]
+
 
                     # calculate the new value
                     newRotationX = round(rotationX + self._RotationValue, 1)
@@ -350,10 +345,7 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     current_frame = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
 
                     pose = omni.usd.utils.get_world_transform_matrix(camera, current_frame)
-                    print("Matrix Form:", pose)
                     transform = pose.ExtractTranslation()
-
-                    print("Translation: ", transform)
                     
                     transformX = transform[0]
                     transformY = transform[1]
@@ -381,10 +373,7 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     current_frame = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
 
                     pose = omni.usd.utils.get_world_transform_matrix(camera, current_frame)
-                    print("Matrix Form:", pose)
                     transform = pose.ExtractTranslation()
-
-                    print("Translation: ", transform)
                     
                     transformX = transform[0]
                     transformY = transform[1]
@@ -411,10 +400,7 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     current_frame = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
 
                     pose = omni.usd.utils.get_world_transform_matrix(camera, current_frame)
-                    print("Matrix Form:", pose)
                     transform = pose.ExtractTranslation()
-
-                    print("Translation: ", transform)
                     
                     transformX = transform[0]
                     transformY = transform[1]
@@ -439,10 +425,8 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     current_frame = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
 
                     pose = omni.usd.utils.get_world_transform_matrix(camera, current_frame)
-                    print("Matrix Form:", pose)
                     transform = pose.ExtractTranslation()
 
-                    print("Translation: ", transform)
                     
                     transformX = transform[0]
                     transformY = transform[1]
@@ -469,10 +453,8 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     current_frame = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
 
                     pose = omni.usd.utils.get_world_transform_matrix(camera, current_frame)
-                    print("Matrix Form:", pose)
                     transform = pose.ExtractTranslation()
 
-                    print("Translation: ", transform)
                     
                     transformX = transform[0]
                     transformY = transform[1]
@@ -498,10 +480,7 @@ class DatajugglerCamerakeysExtension(omni.ext.IExt):
                     current_frame = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
 
                     pose = omni.usd.utils.get_world_transform_matrix(camera, current_frame)
-                    print("Matrix Form:", pose)
                     transform = pose.ExtractTranslation()
-
-                    print("Translation: ", transform)
                     
                     transformX = transform[0]
                     transformY = transform[1]
