@@ -292,7 +292,7 @@ class BookshelfGenerator:
         self.proto_ids = []
         self.get_prototype_attrs()
         self.clear_boards()
-        self.create_frame()
+        #self.create_frame()
     
         # Call the method to generate buildings with streets
         self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
