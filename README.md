@@ -1,4 +1,9 @@
-# Bookshelf Generator
+# Procedural Video Renderer
+### Progress 12/18
+
+[complete walkthrough](https://youtu.be/f7Z7pYck0eY)
+
+# Original Bookshelf Generator
 
 This NVIDIA Omniverse Kit Extension procedurally creates bookshelves with variable height and width and it fills the shelves with books. It is part of a series of live coding sessions that I worked on. This is a great project to study if you are interested in learning more about USD, PointInstancers and Kit Extensions. Watch the recordings of the [full Bookshelf Generator live coding series](https://www.youtube.com/playlist?list=PL3jK4xNnlCVcDS_DgtTSAljdC2KUliU1F).
 
