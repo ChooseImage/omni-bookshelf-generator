@@ -295,7 +295,7 @@ class BookshelfGenerator:
         #self.create_frame()
     
         # Call the method to generate buildings with streets
-        #self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
+        self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
         
         # Create camera
         # Create the camera with the desired starting position
@@ -306,11 +306,8 @@ class BookshelfGenerator:
         end_frame = 100
         end_position = [50, 150, 50]  # Final position of the camera
         target_prim_path = str(self.asset_root_path)  # Targeting the asset root
-        self.set_translation_keyframe("/World/Camera_1", (5000, 400, -400), 0)
-        self.set_translation_keyframe("/World/Camera_1", (0, 400, 0), 3)
-    
-        # Animate the camera
-        #self.animate_camera(self._stage, camera, start_frame, end_frame, end_position, target_prim_path)
+        self.set_translation_keyframe("/World/Camera_1", (5000, 400, -400), 0)##
+        self.set_translation_keyframe("/World/Camera_1", (0, 400, -400), 4)
 
         # Add shelves and other configurations
         #self.create_shelves(self.num_shelves)
@@ -319,6 +316,7 @@ class BookshelfGenerator:
         timeline = omni.timeline.get_timeline_interface()
         #time_in_seconds = desired_frame / fps
         timeline.set_current_time(4)
+        self.capture("/World/Camera_1")
 
 
     def clear_boards(self):
@@ -397,68 +395,28 @@ class BookshelfGenerator:
         for path in paths:
             omni.kit.commands.execute('SetAnimCurveKeys', paths=[path])
 
+    def capture(self, pov_path):
+        captureInstance = omni.kit.capture.viewport.CaptureExtension.get_instance()
+        captureInstance.options.output_folder = r'C:\Users\gliacloud\Desktop'
+        captureInstance.options.file_name = 'test_capture'
+        captureInstance.options.file_type = '.mp4'
+        #captureInstance.options.file_type = data.get(“fileType”, “.png”)
+        captureInstance.options.camera = pov_path
+        captureInstance.options.start_frame = 1
+        captureInstance.options.end_frame = 100
+        captureInstance.options.res_width = 1920
+        captureInstance.options.res_height = 1080
+        captureInstance.options.fps = 24
+        captureInstance.options.spp_per_interation = 1
+        captureInstance.options.path_trace_spp = 1
+        captureInstance.options.ptmb_subframes_per_frame = 1
+        captureInstance.options.ptmb_fso = 0.0
+        captureInstance.options.ptmb_fsc = 1.0
+        captureInstance.options.save_alpha = False
+        captureInstance.options.preroll_frames = 0
 
-    @staticmethod
-    def animate_camera(stage, camera, start_frame, end_frame, end_position, target_prim_path):
-        """
-        Animates the camera from its current position to the specified end position while keeping focus on the target object.
-
-        Args:
-            stage (Usd.Stage): The USD stage containing the camera and target prim.
-            camera (UsdGeom.Camera): The camera to animate.
-            start_frame (int): The frame to start the animation.
-            end_frame (int): The frame to end the animation.
-            end_position (list): The target position [x, y, z] for the camera.
-            target_prim_path (str): The USD path of the target object.
-        """
-        # Access the prim for the camera
-        camera_prim = camera.GetPrim()
-
-        # Calculate the total number of frames
-        total_frames = end_frame - start_frame
-
-        # Get the camera's current position
-        translate_attr = camera_prim.GetAttribute("xformOp:translate")
-        start_position = translate_attr.Get(Usd.TimeCode.Default())
-
-        # Interpolate between start and end positions
-        for frame in range(start_frame, end_frame + 1):
-            t = (frame - start_frame) / total_frames
-            current_position = Gf.Vec3d(
-                start_position[0] + t * (end_position[0] - start_position[0]),
-                start_position[1] + t * (end_position[1] - start_position[1]),
-                start_position[2] + t * (end_position[2] - start_position[2]),
-            )
-
-            # Set camera translation
-            translate_attr.Set(current_position, Usd.TimeCode(frame))
-
-            # Calculate orientation to face the target object
-            target_prim = stage.GetPrimAtPath(target_prim_path)
-            if not target_prim.IsValid():
-                raise ValueError(f"Target prim path '{target_prim_path}' is not valid.")
-
-            target_transform = UsdGeom.Xformable(target_prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
-            target_position = target_transform.ExtractTranslation()
-
-            # Compute the forward, up, and right vectors
-            forward = (target_position - current_position).GetNormalized()
-            up = Gf.Vec3d(0, 1, 0)
-            right = Gf.Cross(up, forward).GetNormalized()
-            up = Gf.Cross(forward, right).GetNormalized()
-
-            # Decompose rotation into Euler angles
-            rotation = Gf.Rotation()
-            rotation.SetRotateInto(forward, Gf.Vec3d(0, 0, -1))  # Align forward vector with camera direction (-Z axis)
-
-            # Extract Euler angles
-            euler_angles = rotation.GetEulerAngles()
-
-            # Set camera rotation
-            rotate_attr = camera_prim.GetAttribute("xformOp:rotateXYZ")
-            rotate_attr.Set(euler_angles, Usd.TimeCode(frame))
-
-
+        captureInstance.start()
+    
     def create_shelves(self, num_shelves):
         translate_attr = self.instancer.GetPrim().GetAttribute("xformOp:translate")
         translate_attr.Set(stage_up_adjust(self._stage, [-self.width/2, self.thickness/2, 0], Gf.Vec3d))
