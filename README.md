@@ -1,7 +1,24 @@
 # Procedural Video Renderer
-### Progress 12/18
 
-[complete walkthrough](https://youtu.be/f7Z7pYck0eY)
+## Progress 12/18
+
+### Completed a minimal full workflow
+#### Instruction
+- Load Bookshelfgenerator extension
+- Bookshelf generator > Create New > Prototypes > Create Default Prototype
+- Generate
+- System will automatically generates a test scene and animate a camera to move through the scene, capturing that view from the camera and store it at Desktop
+
+
+[View complete walkthrough](https://youtu.be/f7Z7pYck0eY)
+
+#### Todos
+- Function logic cleanup
+- Refine Parameters, delicates better variable controls to a comprehensive script format (Camera properties, scene positions...)
+- Package extension into a service
+
+
+---
 
 # Original Bookshelf Generator
 
