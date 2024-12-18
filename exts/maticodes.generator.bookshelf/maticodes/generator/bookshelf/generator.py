@@ -295,7 +295,7 @@ class BookshelfGenerator:
         #self.create_frame()
     
         # Call the method to generate buildings with streets
-        self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
+        #self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
         
         # Create camera
         # Create the camera with the desired starting position
@@ -306,6 +306,8 @@ class BookshelfGenerator:
         end_frame = 100
         end_position = [50, 150, 50]  # Final position of the camera
         target_prim_path = str(self.asset_root_path)  # Targeting the asset root
+        self.set_translation_keyframe("/World/Camera_1", (5000, 400, -400), 0)
+        self.set_translation_keyframe("/World/Camera_1", (0, 400, 0), 3)
     
         # Animate the camera
         #self.animate_camera(self._stage, camera, start_frame, end_frame, end_position, target_prim_path)
@@ -365,6 +367,37 @@ class BookshelfGenerator:
         self.instancer.GetScalesAttr().Set(self.scales)
         self.instancer.GetProtoIndicesAttr().Set(self.proto_ids)
         
+    def set_translation_keyframe(self, target_path, translate, time):
+
+        timeline = omni.timeline.get_timeline_interface()
+        #time_in_seconds = desired_frame / fps
+        timeline.set_current_time(time)
+        print(f'---------- set timeline to {time}')
+        print(f'---------- Timeline:{timeline}')
+
+        target_prim = self._stage.GetPrimAtPath(target_path)
+        if not target_prim.IsValid():
+            raise ValueError(f"Camera prim at path {target_path} could not be created or found.")
+
+        # Step 3: Set the translation
+        target_prim.GetAttribute("xformOp:translate").Set(Gf.Vec3d(*translate))
+
+
+        # Define the dynamic paths
+        paths = [
+            f'{target_path}.xformOp:translate|x',
+            f'{target_path}.xformOp:translate|y',
+            f'{target_path}.xformOp:translate|z',
+            f'{target_path}.xformOp:rotateYXZ|x',
+            f'{target_path}.xformOp:rotateYXZ|y',
+            f'{target_path}.xformOp:rotateYXZ|z',
+        ]
+
+        # Execute the command for each dynamic path
+        for path in paths:
+            omni.kit.commands.execute('SetAnimCurveKeys', paths=[path])
+
+
     @staticmethod
     def animate_camera(stage, camera, start_frame, end_frame, end_position, target_prim_path):
         """
