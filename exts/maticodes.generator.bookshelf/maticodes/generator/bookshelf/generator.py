@@ -293,6 +293,21 @@ class BookshelfGenerator:
         self.get_prototype_attrs()
         self.clear_boards()
         #self.create_frame()
+
+        # Create a plane at the center of the stage
+        plane_path = omni.usd.get_stage_next_free_path(self._stage, "/World/Plane_01", False)
+        success, result = omni.kit.commands.execute('CreateMeshPrimWithDefaultXform', prim_type='Plane')
+        omni.kit.commands.execute('MovePrim', path_from=result, path_to=plane_path)
+
+        # Adjust plane scale and position
+        plane_prim = self._stage.GetPrimAtPath(plane_path)
+        print(f'----------plane: {plane_prim}')
+        scale = Gf.Vec3d(100, 1, 100)  # Scale X and Z by 100, keep Y at 1
+        plane_prim.GetAttribute("xformOp:scale").Set(scale)
+
+        # Translate plane so Y is 0
+        translate = stage_up_adjust(self._stage, [0, 0, 0], Gf.Vec3d)
+
     
         # Call the method to generate buildings with streets
         self.generate_multiple_buildings(num_blocks=num_blocks, buildings_per_block=3, width=width, height=height, depth=depth, block_spacing=block_spacing, building_spacing=building_spacing)
